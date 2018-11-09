@@ -1,0 +1,69 @@
+FROM centos:7
+LABEL maintaner="Zhang Hong zhanghonged@126.com"
+
+ARG PYPI
+ARG JIMVC_PATH
+ARG JIMVC_DOWNLOAD_URL
+ARG DBNAME
+ARG DBHOST
+ARG DBUSER
+ARG DBPASSWORD
+ARG REDISHOST
+ARG REDISPASSWORD
+
+# 更换aliyun yum源
+RUN set -x \
+        && mv /etc/yum.repos.d/CentOS-Base.repo /etc/yum.repos.d/CentOS-Base.repo.bakup \
+        && curl -fsSL http://mirrors.aliyun.com/repo/Centos-7.repo -o /etc/yum.repos.d/CentOS-Base.repo \
+        && yum clean all \
+        && yum makecache
+
+# 设置系统时区
+RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && echo "Asia/Shanghai" > /etc/timezone
+
+
+# 安装pytho环境
+RUN set -x \
+        && yum install epel-release -y \
+        && yum install python2-pip git psmisc -y \
+        && pip install --upgrade pip -i ${PYPI}
+
+# 本地软件包拷贝到容器
+#COPY master.tar.gz /
+#RUN set -x \
+#        && mkdir -p $JIMVC_PATH \
+#        && mkdir /run/jimv \
+#        && mkdir -p /opt/templates \
+#        && tar -zxf /master.tar.gz --strip-components 1 -C ${JIMVC_PATH}
+
+
+# github下载软件包到容器
+RUN set -x  \
+        && mkdir /run/jimv \
+        && mkdir -p $JIMVC_PATH \
+        && mkdir -p /opt/templates \
+        && curl -sL ${JIMVC_DOWNLOAD_URL} | tar -zxf - --strip-components 1 -C ${JIMVC_PATH}
+
+WORKDIR ${JIMVC_PATH}
+
+# 安装python依赖包
+RUN set -x \
+        && pip install wheel -i $PYPI \
+        && grep -v "^$" requirements.txt | xargs -n 1 pip install -i $PYPI
+
+# 拷贝jimvc配置文件和启动等待脚本
+COPY jimvc.conf /etc/
+COPY wait-for-it.sh $JIMVC_PATH
+
+# 处理jimvc配置文件
+RUN set -x \ 
+        && sed -i "s/DBNAME/$DBNAME/" /etc/jimvc.conf \
+        && sed -i "s/DBHOST/$DBHOST/" /etc/jimvc.conf \
+        && sed -i "s/DBUSER/$DBUSER/" /etc/jimvc.conf \
+        && sed -i "s/DBPASSWORD/$DBPASSWORD/" /etc/jimvc.conf \
+        && sed -i "s/REDISHOST/$REDISHOST/" /etc/jimvc.conf \
+        && sed -i "s/REDISPASSWORD/$REDISPASSWORD/" /etc/jimvc.conf
+
+
+# 启动服务，等待mysql 3306端口可用后，才启动服务
+CMD ["./wait-for-it.sh", "mysql:3306", "--","gunicorn" "-c" "gunicorn_config.py" "main:app"]

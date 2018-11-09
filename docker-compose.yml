@@ -1,0 +1,62 @@
+version: '2'
+services: 
+  base: 
+    build:
+      context: ./base
+      args:
+        - PYPI=https://mirrors.aliyun.com/pypi/simple/
+        - JIMVC_PATH=/usr/local/JimV-C
+        - JIMVC_DOWNLOAD_URL=https://github.com/jamesiter/JimV-C/archive/master.tar.gz
+        - DBNAME=jimv
+        - DBHOST=mysql
+        - DBUSER=root
+        - DBPASSWORD=mydb
+        - REDISHOST=redis
+        - REDISPASSWORD=myredis
+    command: ./wait-for-it.sh mysql:3306 -- gunicorn -c gunicorn_config.py main:app
+    ports:
+      - 8008:8008
+      #- 50000-50100:50000-50100
+    volumes:
+      - ./data/templates:/opt/templates
+    depends_on:
+      - redis
+      - mysql
+    links:
+      - redis
+      - mysql
+    networks:
+      - back
+      - front
+
+  mysql:
+    restart: always
+    build: ./mysql
+    command: mysqld --character-set-server=utf8 --collation-server=utf8_general_ci
+    environment:
+       MYSQL_ROOT_PASSWORD: mydb
+       MYSQL_DATABASE: jimv
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+    networks:
+      - back
+
+  redis:
+    restart: always
+    image: redis:alpine3.8 
+    volumes: 
+      - ./data/redis:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+    ports:
+      - '6379:6379'
+    command: redis-server /usr/local/etc/redis/redis.conf --appendonly yes
+    environment:
+      TZ: "Asia/Shanghai"
+    networks:
+      - front
+
+networks:
+  back:
+    driver: bridge
+  front:
+    driver: bridge
