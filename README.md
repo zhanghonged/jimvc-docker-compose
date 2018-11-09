@@ -10,4 +10,4 @@ Jimv-C地址: https://github.com/jamesiter/JimV-C
 
 4、在宿主机上开启nfs，共享data/templates目录，给计算节点使用
 
-这里用到了<span style="color:red;font-weight:bold;">wait-for-it.sh</span> 等待mysql服务器启动完成才启动应用程序，<span style="color:red;font-weight:bold;">wait-for-it.sh</span>地址为: https://github.com/vishnubob/wait-for-it
+* 这里用到了 `wait-for-it.sh` 等待mysql服务器启动完成才启动应用程序，项目地址为: https://github.com/vishnubob/wait-for-it
